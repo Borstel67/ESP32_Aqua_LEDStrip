@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+    <title>Aquarium LED</title>
+    <link rel="stylesheet" type="text/css" href="WifiManager.css">
+</head>
+<body>
+    <div class="app wide">
+        <div class="header">
+            <div class="title">
+                <div class="logo" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" class="wifi-icon" aria-hidden="true">
+                        <circle cx="12" cy="12" r="4" />
+                        <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1" />
+                    </svg>
+                </div>
+                <div>
+                    <h1>Aquarium LED</h1>
+                    <div class="hint" style="margin:0"><span id="st-date">--.--.----</span> · <span id="st-ntp">…</span></div>
+                </div>
+            </div>
+            <div class="actions">
+                <a class="gear" href="/" title="Startseite" aria-label="Startseite">🏠</a>
+                <a class="gear" href="/config" title="Konfiguration" aria-label="Konfiguration">⚙️</a>
+            </div>
+        </div>
+
+        <!-- Live-Status (Abfrage jede Sekunde) -->
+        <div class="card">
+            <section class="sec">
+                <h2>Status</h2>
+                <div class="tiles">
+                    <div class="tile"><div class="k">Uhrzeit</div><div class="v" id="st-time">--:--:--</div><div class="s" id="st-dst"></div></div>
+                    <div class="tile"><div class="k">Wassertemperatur</div><div class="v" id="st-temp">–</div><div class="s">DS18B20</div></div>
+                    <div class="tile"><div class="k">Sonne</div><div class="v"><span id="st-rise">--:--</span> – <span id="st-set">--:--</span></div><div class="s">Aufgang – Untergang</div></div>
+                    <div class="tile"><div class="k">Mond</div><div class="v" id="st-moon">–</div><div class="s" id="st-moon2"></div></div>
+                </div>
+                <div class="chips" id="st-chips"></div>
+            </section>
+        </div>
+
+        <form id="form" autocomplete="off">
+            <div class="card">
+                <section class="sec">
+                    <h2>LED-Strip</h2>
+                    <div class="row">
+                        <label for="leds">Anzahl LEDs</label>
+                        <input id="leds" class="input num" type="number" min="1" max="300" required />
+                        <span class="sep">max. 300</span>
+                    </div>
+                    <p class="hint">Die LEDs werden reihum auf die 4 Kanäle verteilt: Kanal 1 = LED 1, 5, 9, … · Kanal 2 = LED 2, 6, 10, … usw.</p>
+                </section>
+                <section class="sec">
+                    <h2>Sonnenaufgang / -untergang (Dimmung)</h2>
+                    <div class="row">
+                        <label for="ramp-step">Dauer je Stufe</label>
+                        <input id="ramp-step" class="input num" type="number" min="0" max="120" required />
+                        <span class="sep">min (0 = hart schalten)</span>
+                    </div>
+                    <div class="row">
+                        <label>Stufen</label>
+                        <input id="ramp-0" class="input num" type="number" min="1" max="100" required aria-label="Stufe 1" /><span class="sep">%</span>
+                        <input id="ramp-1" class="input num" type="number" min="1" max="100" required aria-label="Stufe 2" /><span class="sep">%</span>
+                        <input id="ramp-2" class="input num" type="number" min="1" max="100" required aria-label="Stufe 3" /><span class="sep">%</span>
+                    </div>
+                    <p class="hint">Ab der EIN-Zeit wird in 3 Stufen hochgedimmt (Stufe 1 → 2 → 3), vor der AUS-Zeit in umgekehrter Reihenfolge herunter. Zwischen den Stufen wird von der AUS-Farbe zur EIN-Farbe gemischt.</p>
+                </section>
+            </div>
+
+            <div class="card" id="channels"></div>
+
+            <div class="card">
+                <section class="sec">
+                    <h2>Mondbeleuchtung <span class="swatch" id="moon-live" title="aktuell"></span></h2>
+                    <div class="row">
+                        <label for="moon-mode">Betriebsart</label>
+                        <select id="moon-mode" class="input">
+                            <option value="0">AUTO</option>
+                            <option value="1">EIN</option>
+                            <option value="2">AUS</option>
+                        </select>
+                        <input id="moon-color" type="color" aria-label="Mondfarbe" />
+                    </div>
+                    <div class="row">
+                        <label for="moon-ranges">LEDs</label>
+                        <input id="moon-ranges" class="input grow" type="text" placeholder="37-48;67-78;107-118" />
+                    </div>
+                    <p class="hint">
+                        Format <code>von-bis;einzeln;von-bis</code>, max. 3 Einträge.<br>
+                        AUTO: Mond an, wenn alle Kanäle außerhalb ihrer Schaltzeiten sind; Helligkeit nach Mondphase.<br>
+                        EIN / AUS: alle 4 Kanäle sind aus, der Mond leuchtet (feste Vollmond-Helligkeit) bzw. ist aus.
+                    </p>
+                </section>
+            </div>
+
+            <div class="footer">
+                <button id="btn-save" class="btn primary" type="submit">Speichern</button>
+            </div>
+            <p id="msg" class="hint" style="min-height:1.2em"></p>
+        </form>
+
+        <footer class="copyright">© 2026 R.Wisser · <span id="ver"></span></footer>
+    </div>
+
+    <template id="tmpl-ch">
+        <section class="sec">
+            <h2><span data-name></span> <span class="swatch" data-live title="aktuell"></span></h2>
+            <div class="row">
+                <label>Betriebsart</label>
+                <select class="input" data-mode aria-label="Betriebsart">
+                    <option value="0">UHR</option>
+                    <option value="1">EIN</option>
+                    <option value="2">AUS</option>
+                </select>
+            </div>
+            <div class="row">
+                <label>Farbe EIN</label>
+                <input type="color" data-on aria-label="Farbe EIN" />
+                <label class="sep" style="min-width:auto">Farbe AUS</label>
+                <input type="color" data-off aria-label="Farbe AUS" />
+            </div>
+            <div class="row">
+                <label>Zeitraum 1</label>
+                <input class="input" type="time" data-p="0" data-k="on" aria-label="Zeitraum 1 EIN" />
+                <span class="sep">bis</span>
+                <input class="input" type="time" data-p="0" data-k="off" aria-label="Zeitraum 1 AUS" />
+            </div>
+            <div class="row">
+                <label>Zeitraum 2</label>
+                <input class="input" type="time" data-p="1" data-k="on" aria-label="Zeitraum 2 EIN" />
+                <span class="sep">bis</span>
+                <input class="input" type="time" data-p="1" data-k="off" aria-label="Zeitraum 2 AUS" />
+            </div>
+            <p class="hint" data-hint></p>
+        </section>
+    </template>
+
+    <script>
+        (function () {
+            const VERSION = "2.0.4";
+            const $ = (id) => document.getElementById(id);
+            $("ver").textContent = "v" + VERSION;
+
+            // ── Kanal-Abschnitte aus Template erzeugen ──
+            const chWrap = $("channels");
+            const tpl = $("tmpl-ch");
+            const chEls = [];
+            for (let i = 0; i < 4; i++) {
+                const frag = tpl.content.cloneNode(true);
+                const sec = frag.querySelector("section");
+                sec.querySelector("[data-name]").textContent = "Kanal " + (i + 1);
+                sec.querySelector("[data-hint]").textContent =
+                    "LED " + (i + 1) + ", " + (i + 5) + ", " + (i + 9) + ", … · Gleiche EIN- und AUS-Zeit = Zeitraum deaktiviert.";
+                chWrap.appendChild(frag);
+                chEls.push(sec);
+            }
+
+            // ── Einstellungen laden / speichern ──
+            const msg = $("msg");
+            const setMsg = (text, ok) => { msg.className = "hint " + (ok ? "ok" : "err"); msg.textContent = text; };
+
+            const fill = (c) => {
+                $("leds").value = c.leds;
+                $("ramp-step").value = c.ramp.step;
+                c.ramp.lv.forEach((v, i) => $("ramp-" + i).value = v);
+                c.ch.forEach((ch, i) => {
+                    const s = chEls[i];
+                    s.querySelector("[data-mode]").value = ch.mode;
+                    s.querySelector("[data-on]").value = ch.on;
+                    s.querySelector("[data-off]").value = ch.off;
+                    s.querySelectorAll("input[type=time]").forEach(inp => {
+                        inp.value = ch.p[+inp.dataset.p][inp.dataset.k];
+                    });
+                });
+                $("moon-mode").value = c.moon.mode;
+                $("moon-color").value = c.moon.color;
+                $("moon-ranges").value = c.moon.ranges;
+            };
+
+            const collect = () => ({
+                leds: +$("leds").value,
+                ramp: { step: +$("ramp-step").value, lv: [0, 1, 2].map(i => +$("ramp-" + i).value) },
+                ch: chEls.map(s => {
+                    const p = [{}, {}];
+                    s.querySelectorAll("input[type=time]").forEach(inp => p[+inp.dataset.p][inp.dataset.k] = inp.value || "00:00");
+                    return {
+                        mode: +s.querySelector("[data-mode]").value,
+                        on: s.querySelector("[data-on]").value,
+                        off: s.querySelector("[data-off]").value,
+                        p
+                    };
+                }),
+                moon: { mode: +$("moon-mode").value, color: $("moon-color").value, ranges: $("moon-ranges").value.trim() }
+            });
+
+            const load = async () => {
+                try {
+                    const r = await fetch("/api/aqua/settings", { cache: "no-store" });
+                    if (!r.ok) throw new Error("HTTP " + r.status);
+                    fill(await r.json());
+                } catch (e) {
+                    console.error(e);
+                    setMsg("Einstellungen konnten nicht geladen werden.", false);
+                }
+            };
+
+            $("form").addEventListener("submit", async (e) => {
+                e.preventDefault();
+                const btn = $("btn-save");
+                btn.disabled = true; btn.textContent = "Wird gespeichert…";
+                try {
+                    const r = await fetch("/api/aqua/settings", {
+                        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(collect())
+                    });
+                    const j = await r.json().catch(() => ({}));
+                    if (!r.ok || !j.ok) setMsg(j.error || ("Speichern fehlgeschlagen (HTTP " + r.status + ")."), false);
+                    else setMsg("Gespeichert.", true);
+                } catch (e) {
+                    setMsg("Fehler beim Speichern.", false);
+                } finally {
+                    btn.disabled = false; btn.textContent = "Speichern";
+                }
+            });
+
+            // ── Live-Status ──
+            const chips = $("st-chips");
+            const renderChips = (chs, moonLit) => {
+                chips.textContent = "";
+                chs.forEach((c, i) => {
+                    const chip = document.createElement("span");
+                    chip.className = "chip" + (c.on ? " on" : "");
+                    const sw = document.createElement("span"); sw.className = "swatch"; sw.style.background = c.color;
+                    chip.appendChild(sw);
+                    chip.appendChild(document.createTextNode("K" + (i + 1) + " " + (c.on ? c.level + " %" : "aus")));
+                    chips.appendChild(chip);
+                    chEls[i].querySelector("[data-live]").style.background = c.color;
+                });
+                const m = document.createElement("span");
+                m.className = "chip" + (moonLit ? " on" : "");
+                m.textContent = "🌙 " + (moonLit ? "an" : "aus");
+                chips.appendChild(m);
+            };
+
+            let busy = false;
+            const poll = async () => {
+                if (busy) return;
+                busy = true;
+                try {
+                    const r = await fetch("/api/aqua/status", { cache: "no-store" });
+                    if (!r.ok) throw new Error("HTTP " + r.status);
+                    const s = await r.json();
+                    $("st-time").textContent = s.time;
+                    $("st-date").textContent = s.date;
+                    $("st-ntp").textContent = "NTP: " + s.ntpText;
+                    $("st-dst").textContent = s.valid ? (s.dstActive ? "Sommerzeit" : "Normalzeit") : "Uhr nicht gesetzt";
+                    const t = $("st-temp");
+                    const err = s.temp >= 999;
+                    t.textContent = err ? "999.99" : s.temp.toFixed(2) + " °C";
+                    t.classList.toggle("err", err);
+                    $("st-rise").textContent = s.sunrise || "--:--";
+                    $("st-set").textContent = s.sunset || "--:--";
+                    $("st-moon").textContent = s.moonAge + " Tage";
+                    $("st-moon2").textContent = "Helligkeit " + s.moonBright + "/256";
+                    $("moon-live").style.background = s.moonLit ? $("moon-color").value : "transparent";
+                    renderChips(s.ch, s.moonLit);
+                } catch (e) {
+                    $("st-ntp").textContent = "keine Verbindung";
+                } finally {
+                    busy = false;
+                }
+            };
+
+            load();
+            poll();
+            setInterval(poll, 1000);
+        })();
+    </script>
+</body>
+</html>
