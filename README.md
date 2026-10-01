@@ -25,7 +25,7 @@ Läuft unabhängig vom WLAN (auch im Portal-Modus); bedient wird sie im STA-Modu
 - **Sonnenauf-/-untergang (Dimmung):** ab EIN-Zeit 3 Stufen hoch, vor AUS-Zeit 3 Stufen herunter; Dauer je Stufe und Helligkeit je Stufe (%) einstellbar, 0 min = hart schalten.
 - **Anzahl LEDs:** 1–300.
 - **Mondbeleuchtung:** LED-Bereiche `von-bis;einzeln;von-bis` (max. 3), eigene Farbe. AUTO: an, wenn alle Kanäle außerhalb ihrer Schaltzeiten sind; Helligkeit = 2 × Tage bis/seit Neumond (/256). EIN/AUS: alle Kanäle aus, Mond an (Vollmond-Helligkeit) bzw. aus.
-- **Uhr:** NTP (Server einstellbar, leer = `us.pool.ntp.org`), Zeitzone GMT-12 … GMT+13, EU-Sommerzeit abschaltbar, manuelle Zeiteinstellung, NTP-Status.
+- **Uhr:** NTP (Server einstellbar, leer = `de.pool.ntp.org`), Zeitzone GMT-12 … GMT+13, EU-Sommerzeit abschaltbar, manuelle Zeiteinstellung, NTP-Status.
 - **Sonne/Mond:** Sonnenaufgang/-untergang und Mondalter aus Breiten-/Längengrad (Bibliothek *sunMoon*).
 - **Temperatur:** DS18B20, Anzeige jede Sekunde; `999.99` bei Sensorfehler.
 - **API:** `GET /api/aqua/status`, `GET/POST /api/aqua/settings` (JSON, Teil-Updates; zusätzlich `ntp` und `setTime`).
@@ -84,8 +84,11 @@ Läuft unabhängig vom WLAN (auch im Portal-Modus); bedient wird sie im STA-Modu
 - Geschützte JSONs können via `setProtectedJsons({...})` von Löschroutinen ausgenommen werden.
 
 ## Hardware-Annahmen
+- WS2812B-Daten: `LED_STRIP_PIN` (Standard GPIO16).
+- DS18B20: `ONEWIRE_PIN` (Standard GPIO4, 4,7 kΩ Pull-up nach 3,3 V).
 - LED: `LED_PIN` (Standard GPIO2).
 - Taster: `BTN_PIN` (Standard GPIO0, LOW-aktiv, -1 zum Deaktivieren).
+- Vollständige Pinbelegung, Anschlussplan, Stromversorgung und Stückliste: [docs/DOKUMENTATION.md](docs/DOKUMENTATION.md#hardware--verdrahtung)
 - Board: ESP32; Sleep ist deaktiviert, Power-Save aus.
 
 ## Hinweise zu Partitionen

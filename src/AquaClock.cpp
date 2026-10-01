@@ -36,9 +36,15 @@ void Clock::onSync(struct timeval* tv) {
 }
 
 void Clock::loop(bool wifiConnected) {
-    // Erste Verbindung: Sync läuft bereits (connectToWiFiSTA/checkReconnect) → nur überwachen
-    if (wifiConnected && !_wasConnected && !_everSynced && !_requestedAt) {
-        _requestedAt = millis() | 1;
+    if (wifiConnected && !_wasConnected) {
+        // SNTP läuft normalerweise schon (connectToWiFiSTA/checkReconnect); kam die Verbindung
+        // auf anderem Weg zustande (z. B. Auto-Reconnect des WiFi-Stacks), hier nachholen
+        if (!esp_sntp_enabled()) {
+            syncTimeDefault(0);
+            AWM_LOGI("🕒 SNTP gestartet");
+        }
+        // Erste Verbindung: Sync überwachen
+        if (!_everSynced && !_requestedAt) _requestedAt = millis() | 1;
     }
     _wasConnected = wifiConnected;
 

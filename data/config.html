@@ -23,10 +23,12 @@
                 </div>
             </div>
             <div class="actions">
-                <a class="gear" href="/" title="Startseite" aria-label="Startseite">🏠</a>
                 <a class="gear" href="/led" title="LED-Steuerung" aria-label="LED-Steuerung">💡</a>
             </div>
         </div>
+        <nav class="pagenav" aria-label="Navigation">
+            <a class="btn" href="/">🏠 Startseite</a>
+        </nav>
 
         <form id="form" autocomplete="off">
             <div class="card">
@@ -38,7 +40,7 @@
                     </div>
                     <div class="row">
                         <label for="ntp">NTP-Server</label>
-                        <input id="ntp" class="input grow" type="text" maxlength="63" placeholder="us.pool.ntp.org" />
+                        <input id="ntp" class="input grow" type="text" maxlength="63" placeholder="de.pool.ntp.org" />
                     </div>
                     <div class="row">
                         <label for="tz">Zeitzone</label>
@@ -48,7 +50,7 @@
                         <label></label>
                         <label class="switch"><input id="dst" type="checkbox" /> Sommer-/Winterzeit (EU-Regel)</label>
                     </div>
-                    <p class="hint">Leerer NTP-Server = <code>us.pool.ntp.org</code>. Sommerzeit: letzter Sonntag im März bis letzter Sonntag im Oktober.</p>
+                    <p class="hint">Leerer NTP-Server = <code>de.pool.ntp.org</code>. Sommerzeit: letzter Sonntag im März bis letzter Sonntag im Oktober.</p>
                 </section>
                 <section class="sec">
                     <h2>Standort (Sonne &amp; Mond)</h2>
@@ -185,6 +187,7 @@
                 busy = true;
                 try {
                     const r = await fetch("/api/aqua/status", { cache: "no-store" });
+                    if (!r.ok) throw new Error("HTTP " + r.status);
                     const s = await r.json();
                     $("now").textContent = s.date + " " + s.time + (s.valid ? (s.dstActive ? " (Sommerzeit)" : "") : "");
                     $("ntp-status").textContent = s.ntpText + (s.lastSync ? " · letzte Sync " + s.lastSync : "");

@@ -9,6 +9,7 @@
 #include <esp_partition.h>
 #include <esp_ota_ops.h>
 #include <time.h>
+#include <esp_sntp.h>
 
 static std::vector<String> _protectedExact;
 static bool     _otaStarted = false;
@@ -143,15 +144,22 @@ void eraseJsonInDir(const char* dirPath) {
 // ── NTP-Synchronisation ───────────────────────────────────────────────────────
 
 bool syncTimeDefault(uint8_t tries) {
-    String n1 = "us.pool.ntp.org", n2 = "time.nist.gov";
+    // lwIP-SNTP speichert nur die Zeiger auf die Servernamen und löst sie bei jeder
+    // Synchronisierung (auch den stündlichen) neu auf → Puffer müssen dauerhaft gültig sein
+    static char n1[64], n2[64];
+
+    String s1 = "de.pool.ntp.org", s2 = "ptbtime1.ptb.de";
     JsonDocument d;
     if (loadConfigDoc(d)) {
         // Leere Strings (Formular ohne Eingabe) → Default behalten
         const String c1 = d["ntp1"] | "", c2 = d["ntp2"] | "";
-        if (c1.length()) n1 = c1;
-        if (c2.length()) n2 = c2;
+        if (c1.length()) s1 = c1;
+        if (c2.length()) s2 = c2;
     }
-    configTime(0, 0, n1.c_str(), n2.c_str());
+    if (esp_sntp_enabled()) esp_sntp_stop();   // erst stoppen, dann Puffer überschreiben
+    strlcpy(n1, s1.c_str(), sizeof(n1));
+    strlcpy(n2, s2.c_str(), sizeof(n2));
+    configTime(0, 0, n1, n2);
     for (uint8_t i = 0; i < tries; ++i) {
         if (time(nullptr) > 100000) return true;
         delay(200);

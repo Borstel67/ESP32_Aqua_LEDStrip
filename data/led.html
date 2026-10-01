@@ -23,13 +23,15 @@
                 </div>
             </div>
             <div class="actions">
-                <a class="gear" href="/" title="Startseite" aria-label="Startseite">🏠</a>
                 <a class="gear" href="/config" title="Konfiguration" aria-label="Konfiguration">⚙️</a>
             </div>
         </div>
+        <nav class="pagenav" aria-label="Navigation">
+            <a class="btn" href="/">🏠 Startseite</a>
+        </nav>
 
         <!-- Live-Status (Abfrage jede Sekunde) -->
-        <div class="card">
+        <div class="card" id="st-card">
             <section class="sec">
                 <h2>Status</h2>
                 <div class="tiles">
@@ -234,7 +236,9 @@
                     chip.className = "chip" + (c.on ? " on" : "");
                     const sw = document.createElement("span"); sw.className = "swatch"; sw.style.background = c.color;
                     chip.appendChild(sw);
-                    chip.appendChild(document.createTextNode("K" + (i + 1) + " " + (c.on ? c.level + " %" : "aus")));
+                    // Außerhalb der Zeiten leuchtet der Kanal in der AUS-Farbe (sofern nicht Schwarz)
+                    const txt = c.on ? c.level + " %" : (c.color.toLowerCase() === "#000000" ? "aus" : "AUS-Farbe");
+                    chip.appendChild(document.createTextNode("K" + (i + 1) + " " + txt));
                     chips.appendChild(chip);
                     chEls[i].querySelector("[data-live]").style.background = c.color;
                 });
@@ -258,16 +262,19 @@
                     $("st-dst").textContent = s.valid ? (s.dstActive ? "Sommerzeit" : "Normalzeit") : "Uhr nicht gesetzt";
                     const t = $("st-temp");
                     const err = s.temp >= 999;
-                    t.textContent = err ? "999.99" : s.temp.toFixed(2) + " °C";
+                    t.textContent = err ? "Sensorfehler" : s.temp.toFixed(2) + " °C";
                     t.classList.toggle("err", err);
                     $("st-rise").textContent = s.sunrise || "--:--";
                     $("st-set").textContent = s.sunset || "--:--";
-                    $("st-moon").textContent = s.moonAge + " Tage";
-                    $("st-moon2").textContent = "Helligkeit " + s.moonBright + "/256";
+                    $("st-moon").textContent = s.valid ? s.moonAge + " Tage" : "–";
+                    $("st-moon2").textContent = !s.valid ? "Uhr nicht gesetzt"
+                        : s.moonLit ? "Helligkeit " + s.moonBright + "/256" : "aus";
                     $("moon-live").style.background = s.moonLit ? $("moon-color").value : "transparent";
                     renderChips(s.ch, s.moonLit);
+                    $("st-card").style.opacity = "";
                 } catch (e) {
                     $("st-ntp").textContent = "keine Verbindung";
+                    $("st-card").style.opacity = "0.5";   // Werte veraltet
                 } finally {
                     busy = false;
                 }

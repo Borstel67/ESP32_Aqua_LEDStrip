@@ -336,7 +336,9 @@ void Controller::handleStatus(AsyncWebServerRequest* r) {
     doc["sunrise"]   = fmtLocal(s.sunrise, "%H:%M");
     doc["sunset"]    = fmtLocal(s.sunset,  "%H:%M");
     doc["moonAge"]   = s.moonAge;
-    doc["moonBright"]= s.moonBright;
+    // tatsächliche Helligkeit wie in render(): aus = 0, EIN = Vollmond, AUTO = nach Mondphase
+    const bool moonOn = getConfig().moonMode == MoonMode::ON;
+    doc["moonBright"]= s.moonLit ? (moonOn ? kMoonFullBright : s.moonBright) : 0;
     doc["moonLit"]   = s.moonLit;
     doc["temp"]      = serialized(String(s.temp, 2));
 
@@ -357,7 +359,7 @@ void Controller::handleSettingsGet(AsyncWebServerRequest* r) {
 
     JsonDocument wifi;
     doc["ntp"] = loadConfigDoc(wifi) ? String(wifi["ntp1"] | "") : String();
-    doc["ntpDefault"] = "us.pool.ntp.org";
+    doc["ntpDefault"] = "de.pool.ntp.org";
     doc["ntpStatus"]  = kNtpText[(uint8_t)_clock.status()];
     doc["now"]        = _clock.valid() ? fmtLocal(_clock.local(), "%Y-%m-%dT%H:%M") : String();
     sendJson(r, 200, doc);

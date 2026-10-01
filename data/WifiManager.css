@@ -590,6 +590,35 @@ details[open] .chev {
     border-color: #385a9b;
 }
 
+/* Menü (Startseite): Buttons untereinander, volle Breite */
+.stack {
+    display: grid;
+    gap: 8px;
+}
+
+    .stack .btn {
+        display: block;
+        text-align: left;
+    }
+
+/* Seitennavigation: Zurück / Startseite */
+.pagenav {
+    display: flex;
+    gap: 8px;
+    margin: 0 0 12px 0;
+}
+
+    .pagenav .btn {
+        flex: 1;
+        text-align: center;
+        padding: 8px 12px;
+        font-size: 14px;
+    }
+
+main.card .pagenav {
+    margin: 12px;
+}
+
 /* --- Aquarium-LED-Steuerung --- */
 a.btn {
     text-decoration: none;

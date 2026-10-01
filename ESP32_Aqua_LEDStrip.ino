@@ -11,6 +11,15 @@
 //    Bedienung im STA-Modus über /led und /config
 
 #include <Arduino.h>
+// Nur für die Bibliothekserkennung von vMicro/Arduino: ElegantOTA, AsyncTCP und ESPAsyncWebServer
+// brauchen diese Core-Bibliotheken im Include-Pfad (sonst z. B. "FS.h: No such file or directory")
+#include <FS.h>
+#include <Update.h>
+#include <Network.h>       // NetworkInterface.h (AsyncTCP)
+#include <WiFi.h>
+#include <SHA1Builder.h>   // Bibliothek Hash (AsyncWebSocket)
+#include <AsyncTCP.h>
+#include <ESPAsyncWebServer.h>
 #ifndef ELEGANTOTA_USE_ASYNC_WEBSERVER
 #define ELEGANTOTA_USE_ASYNC_WEBSERVER 1
 #endif
@@ -19,7 +28,20 @@
 #include <src/ESPWiFiManagerSTA.h>
 #include <src/ESPWiFiManagerCommon.h>
 #include <src/AquaController.h>
-// Nur für die Bibliothekserkennung von vMicro/Arduino (genutzt in src/AquaController.cpp)
+// Nur für die Bibliothekserkennung von vMicro/Arduino: vMicro wertet die Includes unter src/ nicht aus,
+// daher hier jede Bibliothek einbinden, die in src/ benutzt wird
+#include <LittleFS.h>
+#include <Preferences.h>
+#include <DNSServer.h>
+#include <ESPmDNS.h>
+#include <ArduinoOTA.h>
+#include <HTTPClient.h>
+#include <NetworkClientSecure.h>   // HTTPClient
+#include <AsyncUDP.h>              // DNSServer
+#include <ArduinoJson.h>
+#include <Adafruit_NeoPixel.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
 #include <TimeLib.h>
 #include <sunMoon.h>
 

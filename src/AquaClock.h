@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Uhr für die Aquarium-Steuerung:
-// - Systemzeit (UTC) per SNTP (UDP/123), Server aus WLAN-Config "ntp1" (leer = us.pool.ntp.org)
+// - Systemzeit (UTC) per SNTP (UDP/123), Server aus WLAN-Config "ntp1" (leer = de.pool.ntp.org)
 // - Lokalzeit = UTC + Zeitzone (Stunden) + 1 h Sommerzeit nach EU-Regel
 //   (letzter Sonntag im März 01:00 UTC bis letzter Sonntag im Oktober 01:00 UTC)
 // - Manuelle Zeiteinstellung (Lokalzeit → UTC → settimeofday)

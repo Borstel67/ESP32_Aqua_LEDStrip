@@ -26,25 +26,17 @@
                     <div class="hint" style="margin:0">Host: <span id="sta-host"></span></div>
                 </div>
             </div>
-            <div class="actions">
-                <a class="gear" href="/settings" title="Einstellungen" aria-label="Einstellungen">⚙️</a>
-            </div>
         </div>
 
         <div class="card">
-            <section class="sec">
-                <h2>Aquarium</h2>
-                <p class="hint">LED-Strip, Mondlicht und Temperatur steuern bzw. Uhr und Standort einstellen.</p>
-                <div class="row">
-                    <label></label>
-                    <a class="btn primary" href="/led">💡 LED-Steuerung</a>
-                    <a class="btn" href="/config">🕒 Konfiguration</a>
+            <nav class="sec" aria-label="Menü">
+                <h2>Menü</h2>
+                <div class="stack">
+                    <a class="btn" href="/led">💡 LED</a>
+                    <a class="btn" href="/config">🕒 Uhr &amp; Ort</a>
+                    <a class="btn" href="/settings">📶 WLAN</a>
                 </div>
-                <div class="row">
-                    <label></label>
-                    <a class="btn ghost" href="/settings">📶 WLAN-Einstellungen</a>
-                </div>
-            </section>
+            </nav>
             <section class="sec">
                 <h2>Status</h2>
                 <div class="hint">STA-IP: <code id="sta-ip"></code></div>

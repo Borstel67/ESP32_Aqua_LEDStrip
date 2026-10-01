@@ -1,6 +1,6 @@
 # ESP32 Aquarium-LED-Steuerung – Dokumentation
 
-Stand: 30.09.2026
+Stand: 01.10.2026
 
 ## Überblick
 
@@ -18,22 +18,123 @@ Die Firmware steuert einen WS2812B-LED-Strip mit bis zu 300 LEDs über einen ESP
 
 ## Hardware & Verdrahtung
 
-Zielboard ist ein ESP32-WROOM-DA-Modul. Alle Pins sind als `#define` im Sketch `ESP32_Aqua_LEDStrip.ino` änderbar.
+Zielboard ist ein ESP32-WROOM-32-Devkit (gebaut wurde u. a. für *uPesy ESP32 WROOM DevKit* bzw. *ESP32-WROOM-DA*), 4 MB Flash. Alle Pins sind als `#define` im Sketch `ESP32_Aqua_LEDStrip.ino` (Zeilen 27–41) änderbar; sie können auch per Compiler-Flag (`-DLED_STRIP_PIN=…`) überschrieben werden, da jedes Define in `#ifndef` steht.
 
-| Bauteil | GPIO | Define | Hinweis |
-| --- | --- | --- | --- |
-| WS2812B-Daten | 16 | `LED_STRIP_PIN` | Farbreihenfolge GRB, 800 kHz |
-| DS18B20-Daten | 4 | `ONEWIRE_PIN` | 4,7 kΩ Pull-up nach 3,3 V |
-| Status-LED | 2 | `LED_PIN` | Zeigt WLAN-/Portal-Zustand |
-| Taster | 0 | `BTN_PIN` | BOOT-Taste, LOW-aktiv; -1 deaktiviert die Laufzeit-Abfrage |
+### Pinbelegung
 
-- Den Strip aus einem eigenen 5-V-Netzteil versorgen und die Masse mit dem ESP32 verbinden. Eine WS2812B zieht bei vollem Weiß bis etwa 60 mA, 300 LEDs also bis etwa 18 A.
-- Der ESP32 gibt 3,3-V-Pegel aus. Bei langen Leitungen oder Fehlfarben einen Pegelwandler (z. B. 74AHCT125) in die Datenleitung setzen.
-- Für den DS18B20 im Wasser die wasserdichte Ausführung mit Edelstahlhülse verwenden.
+| Funktion | GPIO | Define | Richtung | Pegel / Modus | Code |
+| --- | --- | --- | --- | --- | --- |
+| WS2812B-Datenleitung | **16** | `LED_STRIP_PIN` | Ausgang | 3,3 V, NeoPixel GRB 800 kHz | `AquaController.cpp` (`Adafruit_NeoPixel`) |
+| DS18B20 (1-Wire) | **4** | `ONEWIRE_PIN` | bidirektional, Open-Drain | externer Pull-up 4,7 kΩ → 3,3 V | `AquaController.cpp` (`OneWire`, `DallasTemperature`) |
+| Status-LED | **2** | `LED_PIN` | Ausgang | HIGH-aktiv (HIGH = LED an), Start LOW | `ESPWiFiManagerAP.cpp` (`pinMode(ledPin, OUTPUT)`) |
+| Taster (Provisionierung) | **0** | `BTN_PIN` | Eingang | `INPUT_PULLUP`, LOW = gedrückt | `ESPWiFiManagerAP.cpp`, `loop()` im Sketch |
+| Serielle Konsole TX | 1 | – | Ausgang | UART0, 115200 Baud | `Serial.begin(115200)` |
+| Serielle Konsole RX | 3 | – | Eingang | UART0 | Flashen per USB |
+| SPI-Flash | 6–11 | – | – | intern belegt | **nicht verwenden** |
+
+Bei `BTN_PIN = -1` entfällt nur die Laufzeit-Abfrage im Sketch; der AP-Manager wertet beim Boot weiterhin GPIO0 aus.
+
+### Anschlussplan
+
+```
+                  ESP32-DevKit                         5-V-Netzteil (≥ Strip-Bedarf)
+               ┌───────────────┐                        +5V            GND
+   USB ────────┤ 5V/VIN        │                         │              │
+               │               │                         │   ┌─────────┐│
+               │        GPIO16 ├──[330 Ω]──►(Pegelwandler optional)──►DIN│  WS2812B-Strip
+               │               │                         ├───┤ +5V     ││  LED 1 … n
+               │           GND ├─────────────────────────┼───┤ GND     ├┘
+               │               │                    [1000 µF / 10 V]
+               │               │                         │              │
+               │          3V3  ├────┬─────────────── VDD (rot)  ─┐
+               │               │  [4,7 kΩ]                       │ DS18B20
+               │         GPIO4 ├────┴─────────────── DQ  (gelb) ─┤ wasserdicht
+               │           GND ├──────────────────── GND (schwarz)┘
+               │               │
+               │         GPIO2 ├──[330 Ω]──►|── GND    Status-LED (auf vielen DevKits bereits verbaut)
+               │         GPIO0 ├──┤ Taster ├── GND     BOOT-Taste (auf dem DevKit vorhanden)
+               └───────────────┘
+```
+
+Kabelfarben des DS18B20 können je nach Hersteller abweichen (teils Rot/Gelb/Grün oder Rot/Weiß/Schwarz) – Datenblatt bzw. Aufdruck prüfen.
+
+### Hinweise zu den Pins
+
+- **GPIO0 und GPIO2 sind Strapping-Pins.** GPIO0 LOW beim Reset startet den Download-Modus – den Taster also nicht beim Einschalten gedrückt halten, außer zum Flashen. Wer den Taster mit Strapping-Funktion nicht beim Booten auswerten möchte, legt ihn auf einen freien Pin (z. B. GPIO32) und setzt `BTN_PIN` entsprechend; der AP-Manager nutzt dann diesen Pin. GPIO2 muss beim Flashen LOW oder offen sein; eine LED nach GND stört nicht.
+- **GPIO16** ist auf WROVER-Modulen (mit PSRAM) intern belegt. Bei einem WROVER-Board den Strip auf einen anderen Ausgang legen, z. B. GPIO13, GPIO25 oder GPIO27.
+- **GPIO34–39** sind nur Eingänge ohne internen Pull-up – nicht für Strip oder 1-Wire geeignet.
+- **ADC2-Pins** (u. a. GPIO0, 2, 4, 12–15, 25–27) sind analog nicht nutzbar, solange WLAN aktiv ist; digital (wie hier) ist das unerheblich.
+- **GPIO12** ist ein Strapping-Pin für die Flash-Spannung; nichts mit Pull-up daran anschließen.
+
+Freie, unkritische Pins für Erweiterungen: GPIO13, 14, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33.
+
+### Stromversorgung
+
+| Verbraucher | Typischer Strom | Bemerkung |
+| --- | --- | --- |
+| ESP32 mit WLAN | 80–250 mA (Spitzen ~500 mA) | über USB oder 5 V an VIN |
+| WS2812B je LED | bis ~60 mA (Weiß, 100 %) | ~1 mA im Ruhezustand (Schwarz) |
+| 60 LEDs (Standard) | bis ~3,6 A | |
+| 300 LEDs (Maximum) | bis ~18 A | |
+| DS18B20 | ~1,5 mA beim Messen | |
+
+- Den Strip aus einem eigenen 5-V-Netzteil versorgen und **die Masse mit dem ESP32 verbinden** – ohne gemeinsame Masse kommen keine Daten an.
+- Netzteil mit ~20 % Reserve auf den Maximalstrom auslegen. Die Firmware hat keine globale Strombegrenzung; die Dimmstufen und Farben bestimmen den tatsächlichen Strom. Mit den Standardfarben (Kanal 1 weiß, übrige farbig) liegt der Bedarf deutlich unter dem Weiß-Maximum.
+- Ab etwa 100 LEDs bzw. 1,5 m Länge die 5 V zusätzlich am Ende (und ggf. in der Mitte) einspeisen, sonst verfärben sich die hinteren LEDs ins Rötliche.
+- Elko 1000 µF / ≥ 6,3 V direkt am Strip-Eingang zwischen +5 V und GND, Widerstand 330 Ω in Serie in der Datenleitung nahe am ESP32.
+- Leitungsquerschnitt für die 5-V-Zuleitung: bis 5 A ≥ 0,75 mm², bis 10 A ≥ 1,5 mm². Eine passende Feinsicherung in die +5-V-Leitung setzen.
+- Den ESP32 entweder per USB **oder** aus dem 5-V-Netzteil an VIN versorgen, nicht beides gleichzeitig ohne Schutzdiode.
+
+### Signalpegel
+
+Der ESP32 gibt 3,3 V aus; WS2812B bei 5 V Versorgung erkennen HIGH erst ab ~0,7 × VDD = 3,5 V. Bei kurzer Leitung (< 50 cm) funktioniert es meist trotzdem. Bei Flackern, Fehlfarben oder langer Leitung einen Pegelwandler einsetzen, z. B. 74AHCT125 oder 74HCT245 (mit 5 V versorgt). Alternativ die erste LED über eine Diode (1N4148) mit ~4,3 V versorgen.
+
+### Temperatursensor
+
+- Wasserdichter DS18B20 mit Edelstahlhülse, 3-Draht-Betrieb (kein parasitäres Netzteil).
+- Pull-up 4,7 kΩ zwischen DQ und 3,3 V; bei Kabeln > 5 m auf 2,2 kΩ verringern.
+- Es wird nur der erste gefundene Sensor auf dem Bus ausgewertet (Index 0), Auflösung 12 Bit (0,0625 °C).
+- Der Sensor kann im Betrieb angesteckt werden; der Bus wird bei Fehler alle 30 s neu durchsucht.
+
+### Stückliste
+
+| Anz. | Bauteil | Hinweis |
+| --- | --- | --- |
+| 1 | ESP32-WROOM-32 DevKit (4 MB Flash) | mit BOOT-Taste und LED an GPIO2 |
+| 1 | WS2812B-Strip, 5 V, 1–300 LEDs | Farbreihenfolge GRB |
+| 1 | 5-V-Netzteil | Strom nach Tabelle oben |
+| 1 | DS18B20, wasserdicht | 3-Draht |
+| 1 | Widerstand 4,7 kΩ | 1-Wire-Pull-up |
+| 1 | Widerstand 330 Ω | Serienwiderstand Datenleitung |
+| 1 | Elko 1000 µF, ≥ 6,3 V | Pufferung am Strip |
+| 0–1 | 74AHCT125 o. ä. | Pegelwandler (optional) |
+| 1 | Feinsicherung + Halter | in +5 V |
+| – | Schraubklemmen / Stecker, Kabel | Querschnitt nach Strom |
+
+### LED-Zuordnung am Strip
+
+Die LEDs werden ab dem Einspeisepunkt (DIN) gezählt, beginnend mit 1. Die Kanäle wiederholen sich reihum:
+
+| LED | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | … |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Kanal | 1 | 2 | 3 | 4 | 1 | 2 | 3 | 4 | 1 | … |
+
+Werkseinstellung der Kanäle: 1 = Weiß `#ffffff`, 2 = Blau `#3060ff`, 3 = Warmweiß `#ffb070`, 4 = Rot `#ff4020`. Mond-LEDs werden über ihre Nummern (`von-bis`) adressiert und überschreiben die Kanalfarbe, wenn der Mond leuchtet. LEDs oberhalb von „Anzahl LEDs“ bleiben dunkel.
+
+### Flash-Aufteilung (`partitions.csv`)
+
+| Name | Typ | Offset | Größe | Inhalt |
+| --- | --- | --- | --- | --- |
+| nvs | data/nvs | 0x9000 | 20 KB | WLAN-Config (`awm`), Aqua-Config (`aqua/cfg`) |
+| otadata | data/ota | 0xE000 | 8 KB | aktiver OTA-Slot |
+| app0 | app/ota_0 | 0x10000 | 1,75 MB | Firmware Slot A |
+| app1 | app/ota_1 | 0x1D0000 | 1,75 MB | Firmware Slot B |
+| coredump | data/coredump | 0x390000 | 64 KB | Absturzabbild |
+| littlefs | data/littlefs | 0x3A0000 | 384 KB | Webseiten aus `data/` |
 
 ## Build & Flashen
 
-Gebaut wird mit Visual Studio + vMicro (oder `arduino-cli`) gegen den ESP32-Core 3.3.12. ElegantOTA muss auf den Async-Webserver umgestellt sein (`ELEGANTOTA_USE_ASYNC_WEBSERVER 1` in `ElegantOTA.h` der Bibliothek); sonst scheitert das Linken.
+Gebaut wird mit Visual Studio + vMicro (oder `arduino-cli`) gegen den ESP32-Core 3.3.12. ElegantOTA muss auf den Async-Webserver umgestellt sein; das erledigt `build_opt.h` im Sketch-Ordner (`-DELEGANTOTA_USE_ASYNC_WEBSERVER=1`, wird vom ESP32-Core für alle Quelldateien inkl. Bibliotheken übernommen). Die Bibliothek selbst muss dafür nicht mehr angepasst werden.
 
 | Bibliothek | Version | Zweck |
 | --- | --- | --- |
@@ -108,7 +209,7 @@ Hier werden Uhr und Standort eingestellt; die Kopfzeile zeigt die aktuelle Gerä
 | Feld | Werte | Hinweis |
 | --- | --- | --- |
 | NTP-Status | nie gesetzt / Synchronisierung fehlgeschlagen / synchronisiert | mit Zeitpunkt der letzten Synchronisierung |
-| NTP-Server | Hostname, max. 63 Zeichen | leer = `us.pool.ntp.org`; gleiches Feld wie „NTP 1“ in den WLAN-Einstellungen |
+| NTP-Server | Hostname, max. 63 Zeichen | leer = `de.pool.ntp.org`; gleiches Feld wie „NTP 1“ in den WLAN-Einstellungen |
 | Zeitzone | GMT-12 … GMT+13 | Standardzeit, Deutschland = GMT+1 |
 | Sommer-/Winterzeit | an / aus | EU-Regel, +1 h |
 | Breitengrad | -90 … 90 | Dezimalgrad, Nord positiv |
@@ -244,12 +345,15 @@ Der Strip wird nur neu beschrieben, wenn sich Farben oder Mondzustand ändern, s
 
 | Symptom | Ursache | Lösung |
 | --- | --- | --- |
-| Linker: `undefined reference to ElegantOTAClass::begin(AsyncWebServer*, …)` | ElegantOTA-Bibliothek ohne Async-Modus | In `ElegantOTA.h` `ELEGANTOTA_USE_ASYNC_WEBSERVER` auf 1 setzen bzw. den passenden Bibliotheksordner verwenden |
+| Linker: `undefined reference to ElegantOTAClass::begin(AsyncWebServer*, …)` | ElegantOTA-Bibliothek ohne Async-Modus | `build_opt.h` im Sketch-Ordner muss `-DELEGANTOTA_USE_ASYNC_WEBSERVER=1` enthalten (gilt auch für Bibliotheken); alternativ in `ElegantOTA.h` auf 1 setzen |
+| `fatal error: FS.h` / `NetworkInterface.h` / `SHA1Builder.h` / `WiFi.h`: No such file or directory beim Kompilieren von ElegantOTA, AsyncTCP oder ESPAsyncWebServer | Bibliothekserkennung (vMicro) nimmt Bibliotheken nur auf, wenn die `.ino` sie direkt einbindet – Includes unter `src/` und in anderen Bibliotheken werden nicht ausgewertet | Jede benutzte Bibliothek im Sketch einbinden (Block „Nur für die Bibliothekserkennung“). Wer in `src/` eine neue Bibliothek nutzt, muss sie dort ergänzen |
+| Linker: `undefined reference to AsyncCallbackJsonWebHandler::AsyncCallbackJsonWebHandler(…)` | ESPAsyncWebServer wurde ohne ArduinoJson im Include-Pfad gebaut (`ASYNC_JSON_SUPPORT 0`, `AsyncJson.cpp` leer); vMicro verwendet das alte Objekt aus dem Cache weiter | `#include <ArduinoJson.h>` im Sketch (ist enthalten), dann Build-Cache leeren: vMicro → *Clean* oder Ordner `%LOCALAPPDATA%\Temp\VMBuilds\ESP32_Aqua_LEDStrip\<board>\Debug` löschen |
+| `Adafruit_NeoPixel.h` / `OneWire.h` / `DallasTemperature.h` / `TimeLib.h` / `sunMoon.h` nicht gefunden | Bibliothek nicht installiert | Über den Bibliotheksverwalter installieren (siehe Tabelle unter *Build & Flashen*) |
 | Linker: `ld returned 1 exit status` in vMicro, `Aqua*.o` fehlen im Build-Ordner | Neue `.cpp` nicht in `ESP32_Aqua_LEDStrip.vcxproj` eingetragen | Datei ins Projekt aufnehmen, Projekt neu laden |
 | `expected unqualified-id before 'if'` im Debug-Build | vMicro-Haltepunkt auf der schließenden `}` von `setup()` | Haltepunkt entfernen oder eine Zeile höher setzen, oder Release bauen |
 | Temperatur zeigt `999.99` | Kein DS18B20 gefunden, Pull-up fehlt oder Kabelbruch | Verdrahtung und 4,7 kΩ prüfen; der Bus wird alle 30 s neu durchsucht |
 | Uhr zeigt `--:--:--`, Kanäle bleiben aus | Noch keine NTP-Zeit, keine manuelle Zeit | Unter `/config` NTP-Server prüfen oder Uhrzeit manuell setzen |
-| NTP-Status „fehlgeschlagen“ | Server nicht erreichbar oder UDP 123 gesperrt | Anderen Server eintragen, z. B. `de.pool.ntp.org` |
+| NTP-Status „fehlgeschlagen“ | Server nicht erreichbar oder UDP 123 gesperrt | Anderen Server eintragen, z. B. `ptbtime1.ptb.de` oder die Router-IP |
 | `/led` meldet „led.html nicht gefunden“ | LittleFS-Image veraltet | `LittleFS.ps1` bzw. `LittleFS-OTA.ps1` ausführen |
 | Neue Seiten ohne Gestaltung | `WifiManager.css` ist 1 Tag im Browser zwischengespeichert | Seite mit Strg+F5 neu laden |
 | Falsche Farben am Strip | Farbreihenfolge oder Signalpegel | Strip-Typ GRB prüfen, Pegelwandler einsetzen |
